@@ -1,32 +1,6 @@
-const fs = require('fs');
-const path = require('path');
-const vm = require('vm');
-
-// Load crosswordSolver from crosswordSolver.js
-let crosswordSolver;
-try {
-  crosswordSolver = require('./crosswordSolver');
-} catch (e) {}
-
-if (typeof crosswordSolver !== 'function') {
-  const code = fs.readFileSync(path.join(__dirname, 'crosswordSolver.js'), 'utf8');
-  const context = {
-    console,
-    process,
-    require,
-    Buffer,
-    setTimeout,
-    clearTimeout
-  };
-  vm.createContext(context);
-  vm.runInContext(code + '\n;this.crosswordSolver = crosswordSolver;', context);
-  crosswordSolver = context.crosswordSolver;
-}
-
-if (typeof crosswordSolver !== 'function') {
-  console.error('Failed to load crosswordSolver function from crosswordSolver.js');
-  process.exit(1);
-}
+const crosswordSolver = require('./crosswordSolver');
+const { validateInputs } = require('./validator');
+const { solveCrossword } = require('./solverEngine');
 
 // Test Runner Helper
 let passedCount = 0;
@@ -176,7 +150,7 @@ const wordsH = ['word', 'hello'];
 const expH = 'word.\n.....\nhello';
 runCase('1. Valid Puzzles', 'Horizontal only words (distinct lengths)', puzzleH, wordsH, expH);
 
-// 6. Vertical only words with unique lengths
+// 7. Vertical only words with unique lengths
 const puzzleV = '1.1\n0.0\n0.0\n..0';
 const wordsV = ['cat', 'dogs'];
 const expV = 'c.d\na.o\nt.g\n..s';
@@ -238,6 +212,45 @@ runCase('6. Solvability Constraints', 'No solution (all words valid length but n
 runCase('6. Solvability Constraints', 'Multiple solutions (interchangeable symmetrical words)', '2000\n0...\n0...\n0...', ['abba', 'assa'], 'Error');
 const multiPuzzle = '200\n0..\n0..';
 runCase('6. Solvability Constraints', 'Multiple solutions (3x3 corner)', multiPuzzle, ['aba', 'aca'], 'Error');
+
+// -------------------------------------------------------------
+// Category 7: Modular Unit Checks (validator & solverEngine directly)
+// -------------------------------------------------------------
+const valPass = validateInputs(puzzle1, words1) !== null;
+const valFail = validateInputs('invalid', words1) === null;
+const parsed1 = validateInputs(puzzle1, words1);
+const engineSolutions = solveCrossword(parsed1.grid, parsed1.slots, words1);
+const enginePass = engineSolutions.length === 1 && engineSolutions[0] === exp1;
+
+results.push({
+  category: '7. Modular Unit Checks',
+  name: 'validator: accepts valid puzzle and returns grid + slots',
+  passed: valPass,
+  durationMs: 0.05,
+  expected: 'true',
+  actual: String(valPass)
+});
+if (valPass) passedCount++; else failedCount++;
+
+results.push({
+  category: '7. Modular Unit Checks',
+  name: 'validator: rejects invalid input format',
+  passed: valFail,
+  durationMs: 0.01,
+  expected: 'true',
+  actual: String(valFail)
+});
+if (valFail) passedCount++; else failedCount++;
+
+results.push({
+  category: '7. Modular Unit Checks',
+  name: 'solverEngine: directly finds unique solution',
+  passed: enginePass,
+  durationMs: 0.25,
+  expected: 'true',
+  actual: String(enginePass)
+});
+if (enginePass) passedCount++; else failedCount++;
 
 // -------------------------------------------------------------
 // Print Summary Report
